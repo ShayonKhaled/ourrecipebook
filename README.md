@@ -75,9 +75,37 @@ tags:
 | `content/posts/` | One folder per recipe (page bundle) |
 | `content/search.md` | The search page, wired to the theme's `search` layout |
 | `layouts/` | Small overrides of three theme templates - see below |
+| `assets/scss/light-only.scss` | Light-only page background, loaded after the theme |
 | `archetypes/` | Recipe template used by `hugo new` |
 | `_tools/make_placeholders.py` | Regenerates the placeholder card images |
 | `themes/coyote/` | The theme itself, vendored |
+
+## Light mode only
+
+The site is deliberately light-only; the theme has no dark styling at all.
+
+Two things enforce it:
+
+1. `assets/scss/light-only.scss` paints `html` and `body` white, and sets
+   `color-scheme: light`. This matters more than it sounds: the theme never sets
+   a page background, so the white was previously just the browser's default
+   canvas. A browser is free to repaint a canvas it has no opinion about, which
+   is how the site was ending up dark.
+2. `layouts/partials/head.html` declares `<meta name="color-scheme" content="light">`
+   and the older `supported-color-schemes`.
+
+**Neither can override a browser that force-darkens a page after styling.**
+That happens below the CSS layer, so no stylesheet or meta tag can win. In that
+case the setting must be turned off in the browser:
+
+| Browser | Setting |
+| --- | --- |
+| Brave | `brave://flags/#force-dark-mode` -> Disabled (on by default in Brave) |
+| Chrome | `chrome://flags/#enable-force-dark` -> Disabled, or turn off "Auto Dark Mode" under Appearance |
+| Edge | `edge://flags/#enable-force-dark` -> Disabled |
+
+This is a very common cause of "my site looks dark" on a machine whose OS is set
+to dark mode, and it affects any site without a dark variant - not just this one.
 
 ## Why there are files in `layouts/`
 
