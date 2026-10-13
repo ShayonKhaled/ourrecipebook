@@ -77,6 +77,33 @@ The form is defined in `.github/ISSUE_TEMPLATE/new-recipe.yml` and the automatio
 is `.github/workflows/recipe-from-issue.yml`, which calls
 `_tools/recipe_from_issue.py`.
 
+### One-time setup this depends on
+
+The recipe workflow needs a **`RECIPE_PUSH_TOKEN`** repository secret: a personal
+access token with `repo` scope.
+
+**Why it cannot just use the built-in token.** A push made by a workflow does not
+start another workflow. The bot commits the recipe to `main`, but that commit
+never triggers the normal Pages deploy, so the site would silently stay stale
+while every visible run reported success. That behaviour is not something a
+workflow can opt out of, and it is not fixed by pushing with a personal access
+token either - I tested both.
+
+**So the recipe workflow deploys the site itself.** After committing, it runs its
+own build-and-deploy job (`deploy` in the same file), which shares the `pages`
+concurrency group with the normal deploy so the two can never overlap. The token
+is still needed for the push itself.
+
+To rotate it, create a new token and either re-add the secret under
+**Settings > Secrets and variables > Actions**, or run:
+
+```bash
+echo "<token>" | python _tools/set_repo_secret.py ShayonKhaled/ourrecipebook RECIPE_PUSH_TOKEN "$(cat /dev/stdin)"
+```
+
+`_tools/set_repo_secret.py` encrypts the value with the repository public key, so
+the token is never written to disk or printed.
+
 ### By hand, in the repository
 
 Recipes are **page bundles**: one folder per recipe, holding the write-up and its
