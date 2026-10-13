@@ -1,0 +1,33 @@
+{{/*
+  Override of the Coyote theme's _default/summary.html (the card shown on the
+  home page, tag pages and search page).
+
+  The theme dereferences the page's `image` resource unconditionally:
+
+      {{ $image := .Resources.GetMatch .Params.image }}
+      <img src="{{ $image.RelPermalink }}">
+
+  so a recipe that references a photo which is missing from its bundle failed
+  with "nil pointer evaluating resource.Resource.RelPermalink" - and because the
+  home page renders every card, ONE bad recipe broke the ENTIRE site build. That
+  matters here because recipes arrive from a web form filled in by hand.
+
+  Now the image is optional and a missing file degrades to a plain card.
+*/}}
+<article class="article">
+  <a class="article__inner" href="{{ .Permalink }}">
+    {{ with .Params.image }}
+      {{ with $.Resources.GetMatch . }}
+        <div class="article__header">
+          <img class="article__image" src="{{ .RelPermalink }}" alt="{{ $.Title }}">
+        </div>
+      {{ end }}
+    {{ end }}
+    <div class="article__text">
+      <h3 class="article__title">{{ .Title }}</h3>
+    </div>
+  </a>
+  <footer class="article__footer">
+    <time datetime="{{ .Date }}">{{ .Date.Format "2006/01/02" }}</time>
+  </footer>
+</article>

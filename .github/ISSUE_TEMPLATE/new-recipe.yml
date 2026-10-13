@@ -1,0 +1,86 @@
+name: New recipe
+description: Add a recipe to the book. Fill in the boxes and press submit - no technical knowledge needed.
+title: "[Recipe]: "
+labels: ["new recipe"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Add a recipe
+
+        Fill in the boxes below and press **Submit new issue** at the bottom.
+        That is all you have to do - the recipe appears on the website by itself
+        a couple of minutes later.
+
+        You do not need to know anything about code, and you cannot break
+        anything. If you make a mistake, you can edit it afterwards, or ask and
+        it can be corrected.
+
+  - type: input
+    id: title
+    attributes:
+      label: Recipe name
+      description: The name as it should appear on the website.
+      placeholder: "Example: Lemon garlic pasta"
+    validations:
+      required: true
+
+  - type: upload
+    id: photo
+    attributes:
+      label: Photo of the dish
+      description: |
+        Click the box and choose a photo from your phone or computer.
+        Landscape (wider than it is tall) looks best, but anything works.
+        If you do not have a photo yet, leave this empty and add one later.
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: A sentence or two about it
+      description: What is it, and when do you make it? Plain words are perfect.
+      placeholder: "Example: The pasta we make when it is already late and nobody wants to think."
+
+  - type: textarea
+    id: ingredients
+    attributes:
+      label: Ingredients
+      description: One ingredient per line. Do not worry about formatting.
+      placeholder: |
+        400 g spaghetti
+        6 cloves garlic
+        1 lemon
+    validations:
+      required: true
+
+  - type: textarea
+    id: method
+    attributes:
+      label: How to make it
+      description: |
+        The steps, in order. Write them as a plain numbered list - one step per
+        line, starting with a number.
+      placeholder: |
+        1. Boil the water and salt it well.
+        2. Warm the oil and cook the garlic gently.
+        3. Add the pasta and toss with lemon and cheese.
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything worth remembering (optional)
+      description: What you would change next time, or a warning.
+      placeholder: "Example: The cheese goes in off the heat, otherwise it clumps."
+
+  - type: input
+    id: tags
+    attributes:
+      label: Words to describe it (optional)
+      description: |
+        Separate them with commas. These become the little category pages, so
+        reuse words you have used before where you can.
+      placeholder: "Example: pasta, vegetarian, weeknight"

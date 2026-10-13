@@ -1,0 +1,187 @@
+name: Publish recipe from issue
+
+# Turns a "New recipe" issue form submission into a published recipe.
+# The form itself lives in .github/ISSUE_TEMPLATE/new-recipe.yml.
+#
+# Nothing in the issue text is ever interpolated into a shell command: the body
+# is passed via the environment and parsed by _tools/recipe_from_issue.py.
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: recipe-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Only act on the recipe form, not on ordinary issues.
+    if: contains(github.event.issue.labels.*.name, 'new recipe')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check --quiet pillow
+
+      # Every recipe ends up with a photo file, whether or not one was uploaded,
+      # so the site build can never fail on a missing image.
+      - name: Fetch photo, or draw a placeholder
+        id: photo
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          photo_url="$(printf '%s\n' "$ISSUE_BODY" \
+            | grep -oE 'https://github\.com/user-attachments/assets/[A-Za-z0-9._/-]+' \
+            | head -n 1 || true)"
+
+          if [ -z "$photo_url" ]; then
+            echo "No photo was attached."
+            echo "status=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Downloading the attached photo."
+          # Attachments are not public, so the token is required.
+          if ! curl -sSL --fail --max-time 180 \
+                 -H "Authorization: Bearer $GH_TOKEN" \
+                 -o photo.tmp "$photo_url"; then
+            echo "::warning::Photo download failed; a placeholder will be used."
+            echo "status=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # A failed download can still write an HTML error page, so check the
+          # magic bytes before trusting the file.
+          if ! head -c 4 photo.tmp | grep -qE $'^\xff\xd8\xff|^\x89PNG|^GIF8|^RIFF'; then
+            echo "::warning::Downloaded file is not a recognisable image; using a placeholder."
+            echo "status=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mv photo.tmp photo.upload
+          echo "status=saved" >> "$GITHUB_OUTPUT"
+
+      - name: Build the recipe
+        id: build
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          PHOTO_STATUS: ${{ steps.photo.outputs.status }}
+          PHOTO_NAME: image.jpeg
+        run: |
+          set -euo pipefail
+
+          output="$(python _tools/recipe_from_issue.py)"
+          echo "$output"
+
+          result="$(printf '%s\n' "$output" | sed -n 's/^RESULT://p' | head -n 1)"
+
+          case "$result" in
+            created)
+              dir="$(printf '%s\n' "$output" | sed -n 's/^dir=//p' | head -n 1 | tr -d '\r')"
+              echo "dir=$dir" >> "$GITHUB_OUTPUT"
+              echo "outcome=created" >> "$GITHUB_OUTPUT"
+
+              if [ "$PHOTO_STATUS" = "saved" ]; then
+                mv photo.upload "$dir/image.jpeg"
+              else
+                title="$(printf '%s\n' "$ISSUE_BODY" \
+                  | sed -n '/^### Recipe name$/{n;p;q;}' \
+                  | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                python _tools/make_placeholder.py "$title" "$dir/image.jpeg"
+              fi
+
+              echo "Created $dir"
+              ;;
+            duplicate:*)
+              echo "outcome=duplicate" >> "$GITHUB_OUTPUT"
+              echo "existing=${result#duplicate:}" >> "$GITHUB_OUTPUT"
+              ;;
+            missing-title)
+              echo "outcome=missing-title" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Unexpected result from the parser: $result"
+              exit 1
+              ;;
+          esac
+
+      - name: Explain a duplicate
+        if: steps.build.outputs.outcome == 'duplicate'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+          EXISTING: ${{ steps.build.outputs.existing }}
+        run: |
+          gh issue comment "$ISSUE" --body "There is already a recipe called **$EXISTING** in the book, so nothing was changed.
+
+          If this is a different dish, please edit the title above to make it distinct - for example add \"(Nan's version)\" - and add the recipe again. If you meant to change the existing recipe, tell Shayon and it can be edited directly."
+
+      - name: Explain the missing name
+        if: steps.build.outputs.outcome == 'missing-title'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE" --body "It looks like the **Recipe name** box was left empty, so there was nothing to publish.
+
+          Nothing is lost. Please reply here with the name, or open a new recipe form with it filled in."
+
+      - name: Commit and publish
+        if: steps.build.outputs.outcome == 'created'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add content/posts
+          git commit -m "Add recipe from issue #$ISSUE"
+
+          # Another recipe may have been published a moment ago, so retry.
+          pushed=false
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+            echo "Push failed on attempt $attempt; rebasing and retrying."
+            git pull --rebase origin main
+          done
+
+          if [ "$pushed" != "true" ]; then
+            echo "::error::Could not push the recipe."
+            exit 1
+          fi
+
+          slug="$(basename "${{ steps.build.outputs.dir }}")"
+          gh issue comment "$ISSUE" --body "Thanks! The recipe is in the book and will be on the site in a couple of minutes:
+
+          https://shayonkhaled.github.io/ourrecipebook/posts/$slug/
+
+          This issue is now closed. If anything looks wrong, just say so and it can be fixed."
+
+      - name: Say so if something went wrong
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE" --body "Sorry - the recipe could not be published automatically. Nothing is lost; the recipe is still in this issue, and Shayon can add it by hand."
