@@ -1,8 +1,10 @@
 # Our Recipe Book
 
-A small Hugo site built on the [Coyote theme](https://github.com/nightswinger/hugo-theme-coyote)
-by [nightswinger](https://github.com/nightswinger). Every recipe is a card on the
-home page with its own page, tags, and a Fuse.js search box.
+A small Hugo site built on the [Coyote theme](https://github.com/nightswinger/hugo-theme-coyote).
+Every recipe is a card on the home page with its own page, tags, and a Fuse.js
+search box.
+
+**Live:** <https://shayonkhaled.github.io/ourrecipebook/>
 
 ## Requirements
 
@@ -18,19 +20,30 @@ hugo server
 
 Then open <http://localhost:1313/>.
 
-## Production build
+## Deploying
+
+Deployment is automatic. Pushing to `main` triggers the workflow in
+`.github/workflows/hugo.yml`, which builds the site and publishes it to GitHub
+Pages.
+
+The workflow passes `--baseURL "${{ steps.pages.outputs.base_url }}/"`, which
+GitHub resolves from the repository, so the site works correctly at the
+`/ourrecipebook/` subpath and would keep working if it moved to a custom domain
+- no edit to `hugo.toml` required.
+
+The `baseURL` in `hugo.toml` is only used for local builds. It is left at a
+placeholder, so locally generated absolute links (tag pages, search result
+images) will point at that placeholder rather than the live site. Set it to
+`https://shayonkhaled.github.io/ourrecipebook/` if you want a local production
+build to match live exactly.
+
+To build the output by hand:
 
 ```bash
 hugo --gc --minify
 ```
 
-The finished site lands in `public/`. To deploy, upload that folder, or point
-Netlify / Cloudflare Pages / GitHub Pages at the repo with `hugo --gc --minify`
-as the build command and `public` as the output directory.
-
-Set `baseURL` in `hugo.toml` to your real domain before deploying, otherwise the
-absolute links in the tag pages and search results will point at the placeholder
-`ourrecipebook.example.com`.
+The finished site lands in `public/`.
 
 ## Adding a recipe
 
