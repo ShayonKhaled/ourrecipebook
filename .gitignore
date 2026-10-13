@@ -1,0 +1,14 @@
+# Hugo build output
+public/
+resources/_gen/
+
+# Hugo cache
+.hugo_cache/
+
+# Hugo writes this while serving/building
+.hugo_build.lock
+
+# Go module caches, only needed if the theme is ever switched to a module import
+.gomodcache/
+.gopath/
+.gocache/

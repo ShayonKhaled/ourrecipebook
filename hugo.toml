@@ -1,0 +1,38 @@
+# Our Recipe Book - a Hugo site using the Coyote theme.
+# Theme source: https://github.com/nightswinger/hugo-theme-coyote
+
+baseURL = "https://ourrecipebook.example.com/"
+title = "Our Recipe Book"
+locale = "en-us"
+defaultContentLanguage = "en"
+theme = "coyote"
+
+enableRobotsTXT = true
+timeZone = "UTC"
+
+# The theme lists site.Params.mainSections on the home page, so every content
+# type we want to appear as a card has to be named here.
+[params]
+  mainSections = ["posts"]
+
+  [params.profile]
+    enabled = true
+    name = "Our Recipe Book"
+    description = "Recipes we actually cook at home - short ingredient lists, no fuss, and notes on what worked."
+
+  [[params.social]]
+    name = "github"
+    url = "https://github.com/nightswinger/hugo-theme-coyote"
+
+# Search needs the home page to also emit index.json for Fuse.js.
+[outputs]
+  home = ["HTML", "JSON"]
+
+[markup]
+  [markup.highlight]
+    noClasses = false
+  [markup.goldmark.renderer]
+    unsafe = true
+
+[pagination]
+  pagerSize = 9

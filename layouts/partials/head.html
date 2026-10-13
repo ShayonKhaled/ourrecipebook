@@ -1,0 +1,36 @@
+{{/*
+  Override of the Coyote theme's partials/head.html.
+
+  The theme uses `resources.ToCSS`, which Hugo removed in favour of `css.Sass`
+  (see https://gohugo.io/functions/css/sass/). Everything else is unchanged.
+  Keeping the fix here instead of editing themes/coyote means the theme can be
+  updated or re-cloned without losing it.
+*/}}
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+
+{{/*
+  The theme only has light styling (every background is #fff) and never declared
+  a colour scheme, so this states the intent explicitly: this site has no dark
+  variant. It also stops browsers picking dark-themed form controls.
+
+  Note this does NOT defeat Chrome's "Auto Dark Mode for Web Contents" - that is
+  applied at paint time and ignores both this meta tag and any CSS, so if the
+  site looks inverted the setting itself has to be turned off in the browser.
+*/}}
+<meta name='color-scheme' content='light'>
+
+{{ template "_internal/google_analytics.html" . }}
+
+<title>{{ if not .IsHome }}{{ if .Title }}{{ .Title }} - {{ end }}{{ end }}{{ .Site.Title }}</title>
+
+{{ $sass := resources.Get "scss/style.scss" }}
+{{ $style := $sass | css.Sass | minify | resources.Fingerprint "sha256" }}
+<link rel="stylesheet" href="{{ $style.RelPermalink }}">
+
+{{- if (eq .Layout "search") }}
+  {{ $fusejs := resources.Get "js/fuse.basic.min.js" }}
+  {{ $search := resources.Get "js/search.js" }}
+  {{ $js := slice $fusejs $search | resources.Concat "js/bundle.js" | resources.Fingerprint "sha512" }}
+  <script defer type="text/javascript" src="{{ $js.Permalink }}" integrity="{{ $js.Data.Integrity }}"></script>
+{{- end }}
