@@ -13,6 +13,8 @@ on:
 permissions:
   contents: write
   issues: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: recipe-issue-${{ github.event.issue.number }}
@@ -23,6 +25,9 @@ jobs:
     # Only act on the recipe form, not on ordinary issues.
     if: contains(github.event.issue.labels.*.name, 'new recipe')
     runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+      url: ${{ steps.publish.outputs.url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -143,13 +148,13 @@ jobs:
           Nothing is lost. Please reply here with the name, or open a new recipe form with it filled in."
 
       - name: Commit and publish
+        id: publish
         if: steps.build.outputs.outcome == 'created'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Pushing with the default GITHUB_TOKEN silently suppresses workflow
-          # runs, so the Pages deploy never fired and the site stayed stale.
-          # Pushing with a personal access token does trigger it. See the
-          # "Why the push uses a personal access token" note in the README.
+          # Pushing with the default GITHUB_TOKEN is what a workflow does anyway;
+          # it cannot trigger another workflow, which is why the deploy job below
+          # exists rather than relying on the push-triggered Pages workflow.
           PUSH_TOKEN: ${{ secrets.RECIPE_PUSH_TOKEN }}
           ISSUE: ${{ github.event.issue.number }}
         run: |
@@ -186,9 +191,13 @@ jobs:
           fi
 
           slug="$(basename "${{ steps.build.outputs.dir }}")"
-          gh issue comment "$ISSUE" --body "Thanks! The recipe is in the book and will be on the site in a couple of minutes:
+          echo "published=true" >> "$GITHUB_OUTPUT"
+          echo "url=https://shayonkhaled.github.io/ourrecipebook/posts/$slug/" >> "$GITHUB_OUTPUT"
+          gh issue comment "$ISSUE" --body "Thanks! The recipe is in the book, and is being published now:
 
-          https://shayonkhaled.github.io/ourrecipebook/posts/$slug/"
+          https://shayonkhaled.github.io/ourrecipebook/posts/$slug/
+
+          This issue is closed. If anything looks wrong, just say so and it can be fixed."
           gh issue close "$ISSUE" --reason completed
 
       - name: Say so if something went wrong
@@ -198,3 +207,60 @@ jobs:
           ISSUE: ${{ github.event.issue.number }}
         run: |
           gh issue comment "$ISSUE" --body "Sorry - the recipe could not be published automatically. Nothing is lost; the recipe is still in this issue, and Shayon can add it by hand."
+
+  # The recipe commit above is pushed with a token, and a push from a workflow
+  # does NOT start another workflow - so the normal "Deploy Hugo site" workflow
+  # never fires for it and the site would silently stay stale. Publishing from
+  # here instead removes any dependence on that trigger behaviour.
+  deploy:
+    needs: publish
+    if: needs.publish.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    # Share the Pages group so a recipe publish and a normal push never deploy
+    # at the same time.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      HUGO_VERSION: 0.161.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install Hugo CLI (extended)
+        run: |
+          wget -O "${{ runner.temp }}/hugo.deb" \
+            "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.deb"
+          sudo dpkg -i "${{ runner.temp }}/hugo.deb"
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build with Hugo
+        env:
+          HUGO_CACHEDIR: ${{ runner.temp }}/hugo_cache
+          HUGO_ENVIRONMENT: production
+        run: hugo --minify --gc --baseURL "${{ steps.pages.outputs.base_url }}/"
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+      - name: Confirm on the issue once it is live
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE" --body "It is live now:
+          ${{ needs.publish.outputs.url }}"
