@@ -193,11 +193,11 @@ jobs:
           slug="$(basename "${{ steps.build.outputs.dir }}")"
           echo "published=true" >> "$GITHUB_OUTPUT"
           echo "url=https://shayonkhaled.github.io/ourrecipebook/posts/$slug/" >> "$GITHUB_OUTPUT"
-          gh issue comment "$ISSUE" --body "Thanks! The recipe is in the book, and is being published now:
+          # Kept short: the deploy job appends the "it is live" line once the
+          # site has actually been published, so the two comments read as one.
+          gh issue comment "$ISSUE" --body "Thanks! Your recipe is in the book and is being published now:
 
-          https://shayonkhaled.github.io/ourrecipebook/posts/$slug/
-
-          This issue is closed. If anything looks wrong, just say so and it can be fixed."
+          https://shayonkhaled.github.io/ourrecipebook/posts/$slug/"
           gh issue close "$ISSUE" --reason completed
 
       - name: Say so if something went wrong
