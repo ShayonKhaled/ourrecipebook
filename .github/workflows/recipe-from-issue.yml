@@ -146,6 +146,11 @@ jobs:
         if: steps.build.outputs.outcome == 'created'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pushing with the default GITHUB_TOKEN silently suppresses workflow
+          # runs, so the Pages deploy never fired and the site stayed stale.
+          # Pushing with a personal access token does trigger it. See the
+          # "Why the push uses a personal access token" note in the README.
+          PUSH_TOKEN: ${{ secrets.RECIPE_PUSH_TOKEN }}
           ISSUE: ${{ github.event.issue.number }}
         run: |
           set -euo pipefail
@@ -154,6 +159,15 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add content/posts
           git commit -m "Add recipe from issue #$ISSUE"
+
+          if [ -z "${PUSH_TOKEN:-}" ]; then
+            echo "::error::RECIPE_PUSH_TOKEN is not set, so the recipe cannot be published."
+            echo "::error::Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+          git remote set-url origin \
+            "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           # Another recipe may have been published a moment ago, so retry.
           pushed=false
@@ -174,9 +188,8 @@ jobs:
           slug="$(basename "${{ steps.build.outputs.dir }}")"
           gh issue comment "$ISSUE" --body "Thanks! The recipe is in the book and will be on the site in a couple of minutes:
 
-          https://shayonkhaled.github.io/ourrecipebook/posts/$slug/
-
-          This issue is now closed. If anything looks wrong, just say so and it can be fixed."
+          https://shayonkhaled.github.io/ourrecipebook/posts/$slug/"
+          gh issue close "$ISSUE" --reason completed
 
       - name: Say so if something went wrong
         if: failure()
