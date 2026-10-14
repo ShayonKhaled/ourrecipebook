@@ -9,32 +9,41 @@ from pathlib import Path
 
 CONTENT_ROOT = Path("content/posts")
 
-# Issue form field labels (see .github/ISSUE_TEMPLATE/new-recipe.yml).
-LABELS = {
-    "Name": "title",
-    "Photo": "photo",
-    "About": "description",
-    "Ingredients": "ingredients",
-    "Method": "method",
-    "Notes": "notes",
-    "Tags": "tags",
+# Field labels to internal names. Each field lists the current label first and
+# any earlier wording after it: someone with the form already open when a label
+# changes will still submit the old wording, and the recipe must not be lost.
+FIELDS = {
+    "title": ("Name", "Recipe name"),
+    "photo": ("Photo", "Photo of the dish"),
+    "description": ("About", "A sentence or two about it"),
+    "ingredients": ("Ingredients",),
+    "method": ("Method", "How to make it"),
+    "notes": ("Notes", "Anything worth remembering (optional)"),
+    "tags": ("Tags", "Words to describe it (optional)"),
 }
 
 EMPTY_VALUES = {"", "_no response_", "no response"}
 
 
-def parse_issue_body(body):
-    """GitHub renders each field as '### <label>' followed by its value."""
-    sections = {}
-    for label, key in LABELS.items():
+def find_field(body, labels):
+    """Return the value under the first matching '### <label>' heading."""
+    for label in labels:
         pattern = re.compile(
             r"^###\s+" + re.escape(label) + r"\s*$\n(.*?)(?=^###\s+|\Z)",
             re.MULTILINE | re.DOTALL,
         )
         match = pattern.search(body)
-        value = match.group(1).strip() if match else ""
-        sections[key] = "" if value.lower() in EMPTY_VALUES else value
-    return sections
+        if not match:
+            continue
+        value = match.group(1).strip()
+        if value.lower() not in EMPTY_VALUES:
+            return value
+    return ""
+
+
+def parse_issue_body(body):
+    """GitHub renders each field as '### <label>' followed by its value."""
+    return {key: find_field(body, labels) for key, labels in FIELDS.items()}
 
 
 def slugify(text):

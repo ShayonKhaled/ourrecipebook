@@ -2,7 +2,9 @@ name: Publish recipe from issue
 
 on:
   issues:
-    types: [opened]
+    # reopened is the retry path: if publishing failed, reopening the issue runs
+    # it again rather than making someone re-type the whole recipe.
+    types: [opened, reopened]
 
 permissions:
   contents: write
@@ -166,7 +168,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE: ${{ github.event.issue.number }}
         run: |
-          gh issue comment "$ISSUE" --body "Could not publish automatically. The recipe is still here in the issue."
+          gh issue comment "$ISSUE" --body "Could not publish automatically. The recipe is still here in this issue. Close and reopen it to try again."
 
   # A push made by a workflow does not start another workflow, so the normal
   # Pages deploy never runs for the commit above. Deploy here instead.
