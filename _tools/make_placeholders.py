@@ -1,21 +1,13 @@
-"""
-Generates solid-colour placeholder card images for each recipe.
-
-These are intentionally simple placeholder cards (background colour + dish name),
-meant to be replaced by real photographs later. Run with:
-
-    python _tools/make_placeholders.py
-
-Output is written straight into each recipe's page bundle as image.jpeg.
-"""
+"""Generate placeholder card images for the recipes listed in CARDS."""
 
 import os
+
 from PIL import Image, ImageDraw, ImageFont
 
 WIDTH, HEIGHT = 1200, 600
 MARGIN = 90
 
-# (output bundle dir, dish name, category label, background, text colour)
+# (bundle dir, dish name, category label, background, text colour)
 CARDS = [
     (
         "content/posts/lemon-garlic-pasta",
@@ -40,7 +32,7 @@ CARDS = [
     ),
 ]
 
-FONT_CANDIDATES = [
+FONTS = [
     r"C:\Windows\Fonts\segoeuib.ttf",
     r"C:\Windows\Fonts\arialbd.ttf",
     r"C:\Windows\Fonts\segoeui.ttf",
@@ -49,14 +41,13 @@ FONT_CANDIDATES = [
 
 
 def load_font(size):
-    for path in FONT_CANDIDATES:
+    for path in FONTS:
         if os.path.exists(path):
             return ImageFont.truetype(path, size)
     return ImageFont.load_default()
 
 
-def wrap_to_width(draw, text, font, max_width):
-    """Greedy word wrap so the title fills the card without spilling over."""
+def wrap(draw, text, font, max_width):
     lines, current = [], ""
     for word in text.split():
         candidate = f"{current} {word}".strip()
@@ -74,36 +65,26 @@ def build_card(out_dir, title, label, bg, fg):
     image = Image.new("RGB", (WIDTH, HEIGHT), bg)
     draw = ImageDraw.Draw(image)
 
-    max_width = WIDTH - 2 * MARGIN
-
-    # Shrink the title font until it wraps into at most two lines.
     size = 104
     while size > 44:
         font = load_font(size)
-        lines = wrap_to_width(draw, title, font, max_width)
+        lines = wrap(draw, title, font, WIDTH - 2 * MARGIN)
         if len(lines) <= 2:
             break
         size -= 4
 
     label_font = load_font(30)
     line_height = int(size * 1.18)
-    block_height = line_height * len(lines)
-    label_gap = 34
-    label_height = 34
-
-    total = block_height + label_gap + label_height
+    total = line_height * len(lines) + 34 + 34
     y = (HEIGHT - total) // 2
 
     for line in lines:
         draw.text((MARGIN, y), line, font=font, fill=fg)
         y += line_height
-
-    draw.text((MARGIN, y + label_gap), label, font=label_font, fill=fg)
+    draw.text((MARGIN, y + 34), label, font=label_font, fill=fg)
 
     os.makedirs(out_dir, exist_ok=True)
-    destination = os.path.join(out_dir, "image.jpeg")
-    image.save(destination, "JPEG", quality=88, optimize=True)
-    print(f"wrote {destination}  ({WIDTH}x{HEIGHT})")
+    image.save(os.path.join(out_dir, "image.jpeg"), "JPEG", quality=88, optimize=True)
 
 
 def main():

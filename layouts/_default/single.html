@@ -1,16 +1,9 @@
-{{/*
-  Override of the Coyote theme's _default/single.html.
-
-  The theme assumes every page has an `image` front matter value pointing at a
-  page bundle resource, so any page without one (About, search, ...) failed with
-  "nil pointer evaluating resource.Resource.RelPermalink". Here the header image
-  and the tag list are simply optional.
-*/}}
+{{/* Overrides themes/coyote/layouts/_default/single.html.
+   The theme assumed every page has an image; here both image and tags are optional. */}}
 {{ define "main" }}
 <div class="post">
   {{ with .Params.image }}
-    {{ $image := $.Resources.GetMatch . }}
-    {{ with $image }}
+    {{ with $.Resources.GetMatch . }}
       <div class="post__header">
         <img class="post__image" src="{{ .RelPermalink }}" alt="{{ $.Title }}">
       </div>

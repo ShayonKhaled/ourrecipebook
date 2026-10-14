@@ -1,12 +1,6 @@
-{{/*
-  Override of the Coyote theme's _default/index.json (the Fuse.js search index).
-
-  The theme emits every regular page and builds the card image URL as
-  `permalink + .Params.image`. For pages with no image (About, ...) that produced
-  a broken ".../about/<nil>" URL. Here only pages that actually have an image are
-  indexed, and the image is resolved as a page resource like the rest of the
-  theme does it.
-*/}}
+{{/* Overrides themes/coyote/layouts/_default/index.json.
+   Only pages with a real image are indexed; the theme emitted a broken
+   ".../about/<nil>" URL for pages without one. */}}
 {{- $.Scratch.Add "index" slice -}}
 {{- range site.RegularPages -}}
     {{- $page := . -}}

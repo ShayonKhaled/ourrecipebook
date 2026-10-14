@@ -1,25 +1,8 @@
-{{/*
-  Override of the Coyote theme's partials/head.html.
-
-  The theme uses `resources.ToCSS`, which Hugo removed in favour of `css.Sass`
-  (see https://gohugo.io/functions/css/sass/). Everything else is unchanged.
-  Keeping the fix here instead of editing themes/coyote means the theme can be
-  updated or re-cloned without losing it.
-*/}}
+{{/* Overrides themes/coyote/layouts/partials/head.html.
+   Theme used resources.ToCSS, removed in favour of css.Sass. */}}
 <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
 
-{{/*
-  This site is light-only: the theme has no dark styling, and scss/light-only.scss
-  in the project paints the page background explicitly. Both meta tags below
-  declare that intent, so browsers skip dark-themed form controls and treat the
-  page as dark-mode-unaware.
-
-  Neither tag can override a browser that force-darkens a page after styling
-  (Brave's "Force Dark", Chrome's Auto Dark Mode) - that has to be switched off
-  in the browser. `supported-color-schemes` is the older spelling, still read by
-  Safari and some WebKit builds.
-*/}}
 <meta name='color-scheme' content='light'>
 <meta name='supported-color-schemes' content='light'>
 
@@ -31,7 +14,6 @@
 {{ $style := $sass | css.Sass | minify | resources.Fingerprint "sha256" }}
 <link rel="stylesheet" href="{{ $style.RelPermalink }}">
 
-{{/* Project-level light-only rules, emitted as a separate file after the theme. */}}
 {{ $lightOnly := resources.Get "scss/light-only.scss" }}
 {{ $lightCss := $lightOnly | css.Sass | minify | resources.Fingerprint "sha256" }}
 <link rel="stylesheet" href="{{ $lightCss.RelPermalink }}">

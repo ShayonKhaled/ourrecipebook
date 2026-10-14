@@ -1,11 +1,5 @@
 name: Publish recipe from issue
 
-# Turns a "New recipe" issue form submission into a published recipe.
-# The form itself lives in .github/ISSUE_TEMPLATE/new-recipe.yml.
-#
-# Nothing in the issue text is ever interpolated into a shell command: the body
-# is passed via the environment and parsed by _tools/recipe_from_issue.py.
-
 on:
   issues:
     types: [opened]
@@ -22,7 +16,6 @@ concurrency:
 
 jobs:
   publish:
-    # Only act on the recipe form, not on ordinary issues.
     if: contains(github.event.issue.labels.*.name, 'new recipe')
     runs-on: ubuntu-latest
     outputs:
@@ -40,9 +33,7 @@ jobs:
       - name: Install Pillow
         run: python -m pip install --disable-pip-version-check --quiet pillow
 
-      # Every recipe ends up with a photo file, whether or not one was uploaded,
-      # so the site build can never fail on a missing image.
-      - name: Fetch photo, or draw a placeholder
+      - name: Fetch photo
         id: photo
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
@@ -50,30 +41,22 @@ jobs:
         run: |
           set -euo pipefail
 
-          photo_url="$(printf '%s\n' "$ISSUE_BODY" \
+          url="$(printf '%s\n' "$ISSUE_BODY" \
             | grep -oE 'https://github\.com/user-attachments/assets/[A-Za-z0-9._/-]+' \
             | head -n 1 || true)"
 
-          if [ -z "$photo_url" ]; then
-            echo "No photo was attached."
+          if [ -z "$url" ]; then
             echo "status=none" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "Downloading the attached photo."
-          # Attachments are not public, so the token is required.
           if ! curl -sSL --fail --max-time 180 \
-                 -H "Authorization: Bearer $GH_TOKEN" \
-                 -o photo.tmp "$photo_url"; then
-            echo "::warning::Photo download failed; a placeholder will be used."
+                 -H "Authorization: Bearer $GH_TOKEN" -o photo.tmp "$url"; then
             echo "status=none" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # A failed download can still write an HTML error page, so check the
-          # magic bytes before trusting the file.
           if ! head -c 4 photo.tmp | grep -qE $'^\xff\xd8\xff|^\x89PNG|^GIF8|^RIFF'; then
-            echo "::warning::Downloaded file is not a recognisable image; using a placeholder."
             echo "status=none" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -93,7 +76,6 @@ jobs:
 
           output="$(python _tools/recipe_from_issue.py)"
           echo "$output"
-
           result="$(printf '%s\n' "$output" | sed -n 's/^RESULT://p' | head -n 1)"
 
           case "$result" in
@@ -101,17 +83,14 @@ jobs:
               dir="$(printf '%s\n' "$output" | sed -n 's/^dir=//p' | head -n 1 | tr -d '\r')"
               echo "dir=$dir" >> "$GITHUB_OUTPUT"
               echo "outcome=created" >> "$GITHUB_OUTPUT"
-
               if [ "$PHOTO_STATUS" = "saved" ]; then
                 mv photo.upload "$dir/image.jpeg"
               else
                 title="$(printf '%s\n' "$ISSUE_BODY" \
-                  | sed -n '/^### Recipe name$/{n;p;q;}' \
+                  | sed -n '/^### Name$/{n;p;q;}' \
                   | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
                 python _tools/make_placeholder.py "$title" "$dir/image.jpeg"
               fi
-
-              echo "Created $dir"
               ;;
             duplicate:*)
               echo "outcome=duplicate" >> "$GITHUB_OUTPUT"
@@ -121,103 +100,80 @@ jobs:
               echo "outcome=missing-title" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo "::error::Unexpected result from the parser: $result"
+              echo "::error::Unexpected parser result: $result"
               exit 1
               ;;
           esac
 
-      - name: Explain a duplicate
+      - name: Duplicate
         if: steps.build.outputs.outcome == 'duplicate'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE: ${{ github.event.issue.number }}
           EXISTING: ${{ steps.build.outputs.existing }}
         run: |
-          gh issue comment "$ISSUE" --body "There is already a recipe called **$EXISTING** in the book, so nothing was changed.
+          gh issue comment "$ISSUE" --body "There is already a recipe called **$EXISTING**. If this is a different dish, edit the title above to make it distinct and submit again."
 
-          If this is a different dish, please edit the title above to make it distinct - for example add \"(Nan's version)\" - and add the recipe again. If you meant to change the existing recipe, tell Shayon and it can be edited directly."
-
-      - name: Explain the missing name
+      - name: Missing name
         if: steps.build.outputs.outcome == 'missing-title'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE: ${{ github.event.issue.number }}
         run: |
-          gh issue comment "$ISSUE" --body "It looks like the **Recipe name** box was left empty, so there was nothing to publish.
+          gh issue comment "$ISSUE" --body "The **Name** box was empty, so there was nothing to publish. Reply with the name and it can be added."
 
-          Nothing is lost. Please reply here with the name, or open a new recipe form with it filled in."
-
-      - name: Commit and publish
+      - name: Commit
         id: publish
         if: steps.build.outputs.outcome == 'created'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Pushing with the default GITHUB_TOKEN is what a workflow does anyway;
-          # it cannot trigger another workflow, which is why the deploy job below
-          # exists rather than relying on the push-triggered Pages workflow.
           PUSH_TOKEN: ${{ secrets.RECIPE_PUSH_TOKEN }}
           ISSUE: ${{ github.event.issue.number }}
         run: |
           set -euo pipefail
 
+          if [ -z "${PUSH_TOKEN:-}" ]; then
+            echo "::error::RECIPE_PUSH_TOKEN is not set."
+            exit 1
+          fi
+
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add content/posts
           git commit -m "Add recipe from issue #$ISSUE"
-
-          if [ -z "${PUSH_TOKEN:-}" ]; then
-            echo "::error::RECIPE_PUSH_TOKEN is not set, so the recipe cannot be published."
-            echo "::error::Add it under Settings > Secrets and variables > Actions."
-            exit 1
-          fi
-
           git remote set-url origin \
             "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-          # Another recipe may have been published a moment ago, so retry.
           pushed=false
           for attempt in 1 2 3; do
             if git push origin HEAD:main; then
               pushed=true
               break
             fi
-            echo "Push failed on attempt $attempt; rebasing and retrying."
             git pull --rebase origin main
           done
-
-          if [ "$pushed" != "true" ]; then
-            echo "::error::Could not push the recipe."
-            exit 1
-          fi
+          [ "$pushed" = "true" ] || { echo "::error::Push failed."; exit 1; }
 
           slug="$(basename "${{ steps.build.outputs.dir }}")"
           echo "published=true" >> "$GITHUB_OUTPUT"
           echo "url=https://shayonkhaled.github.io/ourrecipebook/posts/$slug/" >> "$GITHUB_OUTPUT"
-          # Kept short: the deploy job appends the "it is live" line once the
-          # site has actually been published, so the two comments read as one.
-          gh issue comment "$ISSUE" --body "Thanks! Your recipe is in the book and is being published now:
-
-          https://shayonkhaled.github.io/ourrecipebook/posts/$slug/"
+          gh issue comment "$ISSUE" --body "Published: https://shayonkhaled.github.io/ourrecipebook/posts/$slug/"
           gh issue close "$ISSUE" --reason completed
 
-      - name: Say so if something went wrong
+      - name: Failed
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE: ${{ github.event.issue.number }}
         run: |
-          gh issue comment "$ISSUE" --body "Sorry - the recipe could not be published automatically. Nothing is lost; the recipe is still in this issue, and Shayon can add it by hand."
+          gh issue comment "$ISSUE" --body "Could not publish automatically. The recipe is still here in the issue."
 
-  # The recipe commit above is pushed with a token, and a push from a workflow
-  # does NOT start another workflow - so the normal "Deploy Hugo site" workflow
-  # never fires for it and the site would silently stay stale. Publishing from
-  # here instead removes any dependence on that trigger behaviour.
+  # A push made by a workflow does not start another workflow, so the normal
+  # Pages deploy never runs for the commit above. Deploy here instead.
   deploy:
     needs: publish
     if: needs.publish.outputs.published == 'true'
     runs-on: ubuntu-latest
-    # Share the Pages group so a recipe publish and a normal push never deploy
-    # at the same time.
     concurrency:
       group: pages
       cancel-in-progress: false
@@ -232,7 +188,7 @@ jobs:
         with:
           ref: main
 
-      - name: Install Hugo CLI (extended)
+      - name: Install Hugo
         run: |
           wget -O "${{ runner.temp }}/hugo.deb" \
             "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.deb"
@@ -242,25 +198,17 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
 
-      - name: Build with Hugo
+      - name: Build
         env:
           HUGO_CACHEDIR: ${{ runner.temp }}/hugo_cache
           HUGO_ENVIRONMENT: production
         run: hugo --minify --gc --baseURL "${{ steps.pages.outputs.base_url }}/"
 
-      - name: Upload artifact
+      - name: Upload
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./public
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v5
-
-      - name: Confirm on the issue once it is live
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE: ${{ github.event.issue.number }}
-        run: |
-          gh issue comment "$ISSUE" --body "It is live now:
-          ${{ needs.publish.outputs.url }}"

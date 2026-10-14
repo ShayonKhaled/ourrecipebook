@@ -10,7 +10,6 @@ permissions:
   pages: write
   id-token: write
 
-# Allow one concurrent deployment, but never cancel a running production deploy.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -23,7 +22,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # Must be an extended Hugo release: the theme compiles SCSS at build time.
       HUGO_VERSION: 0.161.1
     steps:
       - name: Install Hugo CLI (extended)
@@ -43,9 +41,6 @@ jobs:
         env:
           HUGO_CACHEDIR: ${{ runner.temp }}/hugo_cache
           HUGO_ENVIRONMENT: production
-        # configure-pages resolves the right base URL for us, so this works both
-        # at https://<user>.github.io/<repo>/ and on a custom domain, with no
-        # edit needed to hugo.toml.
         run: hugo --minify --gc --baseURL "${{ steps.pages.outputs.base_url }}/"
 
       - name: Upload artifact

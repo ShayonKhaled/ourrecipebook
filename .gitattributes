@@ -1,14 +1,10 @@
 # Normalise line endings so the build behaves the same on Windows and on the
-# Linux runner that GitHub Pages uses.
+# Linux runner GitHub Pages uses.
 * text=auto eol=lf
 
-# Binary assets must never be converted.
 *.jpeg binary
 *.jpg binary
 *.png binary
 *.gif binary
 *.webp binary
 *.ico binary
-
-# Keep generated/compiled output out of language stats.
-public/** linguist-generated=true

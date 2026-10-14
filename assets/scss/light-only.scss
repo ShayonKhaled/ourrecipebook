@@ -1,18 +1,7 @@
-/* Our Recipe Book - light-only site styles.
-   Loaded after the theme so these rules win by source order. */
-
 :root {
   color-scheme: light;
 }
 
-/* The Coyote theme never paints a page background - it relies on the browser's
-   default canvas, which is white. Some browsers treat that as "no opinion" and
-   repaint it dark (Brave's "Force Dark", Chrome's Auto Dark Mode), which is what
-   turned the site dark. Painting it explicitly removes that ambiguity and keeps
-   the page light regardless of the visitor's OS theme.
-
-   Note: this does NOT override a browser that force-darkens the whole page after
-   styling - for that, Force Dark has to be switched off in the browser itself. */
 html {
   background-color: #ffffff;
   color-scheme: light;

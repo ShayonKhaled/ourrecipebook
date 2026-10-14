@@ -5,10 +5,7 @@ image: "image.jpeg"
 draft: true
 # tags:
 #   - tagA
-#   - tagB
 ---
-
-<!-- One or two sentences on what this dish is and when you make it. -->
 
 ## Ingredients
 
@@ -20,4 +17,3 @@ draft: true
 
 ## Notes
 
-<!-- What you would change next time. -->

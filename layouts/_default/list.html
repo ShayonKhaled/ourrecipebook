@@ -1,10 +1,5 @@
-{{/*
-  Override of the Coyote theme's _default/list.html (tag and section pages).
-
-  The theme built the thumbnail URL as `permalink + .Params.image`, which breaks
-  for a recipe with no photo, and dereferenced the resource unconditionally.
-  Here the thumbnail is optional, mirroring single.html and summary.html.
-*/}}
+{{/* Overrides themes/coyote/layouts/_default/list.html.
+   Thumbnail is optional, as in single.html and summary.html. */}}
 {{- define "main" }}
 <section class="tags">
   <div class="tags__header">
