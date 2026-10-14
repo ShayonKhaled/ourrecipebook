@@ -15,7 +15,8 @@ hugo server
 ## Adding a recipe
 
 Open an issue using the **New recipe** form. Fill in the boxes and submit. A
-workflow writes the page, publishes it, and closes the issue with a link.
+workflow writes the page, publishes it, and closes the issue with a link. If no
+photo is attached, a placeholder card is drawn from the recipe name.
 
 **Setup:** the workflow needs a `RECIPE_PUSH_TOKEN` secret - a personal access
 token with `repo` scope.
@@ -44,8 +45,3 @@ Push to `main`. The workflow builds and publishes to GitHub Pages.
 | `_default/summary.html` | A missing image broke the whole build |
 | `_default/list.html` | Thumbnail URL broke without an image |
 | `_default/index.json` | Emitted a broken `<nil>` image URL for pages without one |
-
-## Placeholders
-
-`_tools/make_placeholders.py` regenerates the card images for the recipes listed
-in it. Needs Pillow.
